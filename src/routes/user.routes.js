@@ -6,6 +6,7 @@ import {
   logoutUser,
   refreshToken,
   registerUser,
+  verifyEmail,
 } from "../controllers/auth.controller.js";
 
 const authRouter = Router();
@@ -16,5 +17,6 @@ authRouter.get("/get-me", getMe);
 authRouter.get("/refresh-token", refreshToken);
 authRouter.get("/logout", logoutUser);
 authRouter.get("/logout-all", logoutAllUsers);
+authRouter.get("/verify-email", verifyEmail);
 
 export default authRouter;
