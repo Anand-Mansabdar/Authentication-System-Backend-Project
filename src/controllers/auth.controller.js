@@ -54,7 +54,7 @@ export const registerUser = async (req, res) => {
   const accessToken = jwt.sign(
     {
       id: newUser._id,
-      sessionId: session._id
+      sessionId: session._id,
     },
     config.JWT_SECRET,
     { expiresIn: "15m" },
@@ -112,6 +112,22 @@ export const refreshToken = async (req, res) => {
 
   const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
 
+  const hashedRefreshToken = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  const session = await sessionModel.findOne({
+    refreshTokenHash: hashedRefreshToken,
+    revoked: false,
+  });
+
+  if (!session) {
+    return res.status(401).json({
+      message: "Incorrect refresh token or session expired",
+    });
+  }
+
   const accessToken = jwt.sign(
     {
       id: decoded.id,
@@ -124,6 +140,14 @@ export const refreshToken = async (req, res) => {
     expiresIn: "7d",
   });
 
+  const newRefreshTokenHash = crypto
+    .createHash("sha256")
+    .update(newRefreshToken)
+    .digest("hex");
+
+  session.refreshTokenHash = newRefreshTokenHash;
+  await session.save();
+
   res.cookie("refreshToken", newRefreshToken, {
     httpOnly: true,
     secure: true,
@@ -134,5 +158,40 @@ export const refreshToken = async (req, res) => {
   return res.status(200).json({
     message: "Access token refreshed successfully",
     accessToken,
+  });
+};
+
+export const logoutUser = async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(400).json({
+      message: "No refresh token available in cookies",
+    });
+  }
+
+  const hashedRefreshToken = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  const session = await sessionModel.findOne({
+    refreshTokenHash: hashedRefreshToken,
+    revoked: false,
+  });
+
+  if (!session) {
+    return res.status(400).json({
+      message: "Invalid refresh token",
+    });
+  }
+
+  session.revoked = true;
+  await session.save();
+
+  res.clearCookie("refreshToken");
+
+  return res.status(200).json({
+    message: "User logged out successfully",
   });
 };
